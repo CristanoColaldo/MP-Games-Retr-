@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>2048 - MP Retro Games</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --tile: 100px;
+      --gap: 15px;
+      --move-ms: 180ms;
+    }
+    body{
+      background:#faf8ef;
+      font-family:"Clear Sans","Helvetica Neue",Arial,sans-serif;
+      margin:0; min-height:100vh;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+    }
+    h1{ margin:0 0 8px; color:#776e65 }
+    #hud{ display:flex; gap:16px; align-items:center; margin-bottom:12px; color:#776e65; font-weight:700 }
+    .badge{ background:#bbada0; color:#fff; padding:8px 12px; border-radius:6px; min-width:110px; text-align:center }
+    #game{
+      position:relative;
+      background:#bbada0; border-radius:8px; padding:15px;
+      display:grid; grid-template-columns:repeat(4, var(--tile)); grid-template-rows:repeat(4, var(--tile)); gap:var(--gap);
+      box-shadow:0 10px 30px rgba(0,0,0,.15);
+    }
+    .cell{
+      background:#cdc1b4; border-radius:6px;
+    }
+    .tile{
+      position:absolute;
+      width:var(--tile); height:var(--tile);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:700; font-size:28px;
+      border-radius:6px;
+      transition: transform var(--move-ms) ease-in-out;
+      will-change: transform;
+      user-select:none;
+    }
+    /* Cores dos valores */
+    .v2 { background:#eee4da; color:#776e65 }
+    .v4 { background:#ede0c8; color:#776e65 }
+    .v8 { background:#f2b179; color:#f9f6f2 }
+    .v16 { background:#f59563; color:#f9f6f2 }
+    .v32 { background:#f67c5f; color:#f9f6f2 }
+    .v64 { background:#f65e3b; color:#f9f6f2 }
+    .v128 { background:#edcf72; color:#f9f6f2; font-size:24px }
+    .v256 { background:#edcc61; color:#f9f6f2; font-size:24px }
+    .v512 { background:#edc850; color:#f9f6f2; font-size:24px }
+    .v1024 { background:#edc53f; color:#f9f6f2; font-size:20px }
+    .v2048 { background:#edc22e; color:#f9f6f2; font-size:20px }
+
+    /* Animações */
+    @keyframes pop {
+      0% { transform: scale(0); }
+      100% { transform: scale(1); }
+    }
+    .spawn {
+      animation: pop 120ms ease-out;
+    }
+    @keyframes bump {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+    .merge-bump {
+      animation: bump 140ms ease-out;
+    }
+
+    /* Overlay Game Over */
+    #overlay{
+      position:absolute; inset:0;
+      background:rgba(238,228,218,.92);
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      border-radius:8px; color:#776e65; font-weight:800; gap:12px; text-align:center
+    }
+    #overlay h2{ margin:0; font-size:36px }
+    #overlay button{
+      background:#8f7a66; color:#fff; border:none; border-radius:6px; padding:10px 18px; font-size:16px; cursor:pointer
+    }
+    #overlay button:hover{ background:#a48c79 }
+    .hint{ font-size:12px; opacity:.8 }
+  </style>
+</head>
+<body>
+  <h1>2048</h1>
+  <div id="hud">
+    <div class="badge" id="score">Pontuação: 0</div>
+    <div class="badge" id="best">Recorde: 0</div>
+    <div class="hint">Use as setas do teclado. R para reiniciar.</div>
+  </div>
+
+  <div id="game" style="width: calc(4*var(--tile) + 3*var(--gap) + 30px); height: calc(4*var(--tile) + 3*var(--gap) + 30px);">
+    <!-- 16 células de fundo -->
+  </div>
+
+  <script>
+    // ====== Config ======
+    const SIZE = 4;
+    const TILE = 100, GAP = 15; // px
+    const MOVE_MS = 180;
+
+    // ====== Estado ======
+    let grid;                  // 4x4 com IDs de tiles ou null
+    let tiles = new Map();     // id -> {id, r,c, value, el}
+    let nextId = 1;
+    let moving = false;
+    let score = 0;
+    let best = +localStorage.getItem('best-2048') || 0;
+
+    // ====== DOM ======
+    const game = document.getElementById('game');
+    const scoreEl = document.getElementById('score');
+    const bestEl = document.getElementById('best');
+
+    // cria células de fundo 4x4
+    (function makeCells(){
+      const frag = document.createDocumentFragment();
+      for (let i=0;i<SIZE*SIZE;i++){
+        const c = document.createElement('div');
+        c.className = 'cell';
+        frag.appendChild(c);
+      }
+      game.appendChild(frag);
+      // overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'overlay';
+      overlay.innerHTML = `<h2>Game Over</h2><div class="hint">Sem movimentos possíveis</div>
+        <button id="restart">Reiniciar</button>`;
+      game.appendChild(overlay);
+      document.getElementById('restart').addEventListener('click', init);
+    })();
+
+    function px(r,c){ return `translate(${c*(TILE+GAP)}px, ${r*(TILE+GAP)}px)`; }
+
+    function classFor(v){
+      if (v>=2048) return 'v2048';
+      if (v>=1024) return 'v1024';
+      if (v>=512)  return 'v512';
+      if (v>=256)  return 'v256';
+      if (v>=128)  return 'v128';
+      return 'v'+v;
+    }
+
+    function setScore(s){
+      score = s;
+      scoreEl.textContent = 'Pontuação: ' + score;
+      if (score > best){
+        best = score;
+        localStorage.setItem('best-2048', best);
+      }
+      bestEl.textContent = 'Recorde: ' + best;
+    }
+
+    function init(){
+      // limpa tiles do DOM (mantém células e overlay)
+      [...game.querySelectorAll('.tile')].forEach(t => t.remove());
+      grid = Array.from({length: SIZE}, () => Array(SIZE).fill(null));
+      tiles.clear(); nextId = 1; setScore(0);
+      document.getElementById('overlay').style.display = 'none';
+      // duas peças iniciais
+      addRandomTile(true);
+      addRandomTile(true);
+      updateHUD();
+    }
+
+    function updateHUD(){ setScore(score); }
+
+    function createTile(r,c,value, spawn=true){
+      const id = nextId++;
+      const el = document.createElement('div');
+      el.className = `tile ${classFor(value)}`;
+      el.textContent = value;
+      el.style.transform = px(r,c);
+      el.dataset.id = id;
+      if (spawn){
+        el.classList.add('spawn');
+        // garante que o translate seja mantido durante o pop
+        el.addEventListener('animationend', ()=> el.classList.remove('spawn'), {once:true});
+      }
+      game.appendChild(el);
+      const tile = {id, r, c, value, el};
+      tiles.set(id, tile);
+      grid[r][c] = id;
+      return tile;
+    }
+
+    function addRandomTile(spawn=true){
+      const empty = [];
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (!grid[r][c]) empty.push({r,c});
+      if (!empty.length) return null;
+      const {r,c} = empty[Math.floor(Math.random()*empty.length)];
+      const val = Math.random() < 0.9 ? 2 : 4;
+      return createTile(r,c,val, spawn);
+    }
+
+    function canMove(){
+      // há vazio?
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (!grid[r][c]) return true;
+      // vizinhos iguais?
+      for (let r=0;r<SIZE;r++){
+        for (let c=0;c<SIZE;c++){
+          const id = grid[r][c]; const v = tiles.get(id).value;
+          if (c< SIZE-1){ const id2 = grid[r][c+1]; if (tiles.get(id2).value === v) return true; }
+          if (r< SIZE-1){ const id2 = grid[r+1][c]; if (tiles.get(id2).value === v) return true; }
+        }
+      }
+      return false;
+    }
+
+    function showGameOver(){
+      document.getElementById('overlay').style.display = 'flex';
+    }
+
+    // Calcula plano de movimento para uma direção
+    // dir: 'left' | 'right' | 'up' | 'down'
+    function plan(dir){
+      const lines = [];
+      const actions = []; // {id, from:{r,c}, to:{r,c}}
+      const merges = [];  // {srcId, destId, to:{r,c}}
+      let moved = false;
+
+      function indicesOfLine(line){
+        const arr = [];
+        if (dir==='left' || dir==='right'){
+          const r = line;
+          for (let c=0;c<SIZE;c++) arr.push({r,c});
+          if (dir==='right') arr.reverse();
+        } else {
+          const c = line;
+          for (let r=0;r<SIZE;r++) arr.push({r,c});
+          if (dir==='down') arr.reverse();
+        }
+        return arr;
+      }
+
+      for (let line=0; line<SIZE; line++){
+        const idx = indicesOfLine(line);
+        // pega ids presentes na ordem de movimento
+        const items = [];
+        idx.forEach(({r,c})=>{
+          const id = grid[r][c];
+          if (id) items.push({id, value: tiles.get(id).value, from:{r,c}});
+        });
+
+        let target = 0; // posição-alvo dentro da linha (0..3) no sentido do idx
+        let placed = []; // [{id, value, targetIndex, merged:false}]
+        for (let i=0;i<items.length;i++){
+          const cur = items[i];
+          // pode fundir com o último colocado?
+          if (placed.length>0){
+            const last = placed[placed.length-1];
+            if (!last.merged && last.value === cur.value){
+              // cur vai para o índice do 'last' (merge)
+              const toCoord = idx[target-1]; // posição do last
+              actions.push({id: cur.id, from: cur.from, to: {r: toCoord.r, c: toCoord.c}});
+              merges.push({srcId: cur.id, destId: last.id, to: {r: toCoord.r, c: toCoord.c}});
+              last.merged = true; // não pode fundir de novo
+              moved = moved || (cur.from.r !== toCoord.r || cur.from.c !== toCoord.c);
+              continue;
+            }
+          }
+          // não funde: ocupa target atual
+          const toCoord = idx[target];
+          placed.push({id: cur.id, value: cur.value, targetIndex: target, merged:false});
+          actions.push({id: cur.id, from: cur.from, to: {r: toCoord.r, c: toCoord.c}});
+          moved = moved || (cur.from.r !== toCoord.r || cur.from.c !== toCoord.c);
+          target++;
+        }
+      }
+
+      return {actions, merges, moved};
+    }
+
+    // Executa um movimento com animação
+    async function move(dir){
+      if (moving) return;
+      const {actions, merges, moved} = plan(dir);
+      if (!moved) return;
+
+      moving = true;
+
+      // aplica transform nos que se movem
+      const promises = [];
+      const movedSet = new Set();
+      actions.forEach(({id, to})=>{
+        const t = tiles.get(id);
+        if (!t) return;
+        const el = t.el;
+        // atualiza posição lógica pendente
+        t._to = {r: to.r, c: to.c};
+        // se mudou, anima
+        if (t.r !== to.r || t.c !== to.c){
+          el.style.transform = px(to.r, to.c);
+          movedSet.add(id);
+          promises.push(new Promise(res=>{
+            const done = ()=>{ el.removeEventListener('transitionend', done); res(); };
+            el.addEventListener('transitionend', done, {once:true});
+            // segurança caso transitionend não dispare
+            setTimeout(res, MOVE_MS + 30);
+          }));
+        }
+      });
+
+      // aguarda todas as peças terminarem de deslizar
+      await Promise.all(promises);
+
+      // aplica fusões: remove src, dobra dest, anima bump
+      const scoreAdd = merges.reduce((s,m)=> s + tiles.get(m.destId).value, 0); // soma valores antes de dobrar
+      for (const {srcId, destId} of merges){
+        const src = tiles.get(srcId);
+        const dest = tiles.get(destId);
+        if (!src || !dest) continue;
+        // remove src
+        src.el.remove();
+        tiles.delete(srcId);
+        // dobra dest
+        dest.value *= 2;
+        dest.el.textContent = dest.value;
+        dest.el.className = `tile ${classFor(dest.value)}`;
+        dest.el.classList.add('merge-bump');
+        dest.el.addEventListener('animationend', ()=> dest.el.classList.remove('merge-bump'), {once:true});
+      }
+      // atualiza posições finais no mapa e grid
+      for (const [id, t] of tiles){
+        if (t._to){
+          t.r = t._to.r; t.c = t._to.c; delete t._to;
+        }
+      }
+      // reescreve grid
+      grid = Array.from({length: SIZE}, ()=> Array(SIZE).fill(null));
+      for (const [id, t] of tiles){
+        grid[t.r][t.c] = id;
+      }
+      // pontuação (cada fusão soma o valor NOVO do bloco, padrão 2048)
+      let added = 0;
+      for (const {destId} of merges){
+        const v = tiles.get(destId)?.value || 0;
+        added += v;
+      }
+      setScore(score + added);
+
+      // gera peça nova com spawn
+      addRandomTile(true);
+
+      moving = false;
+
+      // verifica game over
+      if (!canMove()){
+        setTimeout(()=> showGameOver(), 60);
+      }
+    }
+
+    // ====== Controles ======
+    window.addEventListener('keydown', (e)=>{
+  if (document.getElementById('overlay').style.display === 'flex'){
+    if (e.key.toLowerCase()==='r') init();
+    return;
+  }
+  const k = e.key.toLowerCase();
+  if (k === 'a') move('left');
+  else if (k === 'd') move('right');
+  else if (k === 'w') move('up');
+  else if (k === 's') move('down');
+  else if (k === 'r') init();
+});
+
+    // Suporte a toque (swipe)
+    let sx=0, sy=0;
+    game.addEventListener('touchstart', (e)=>{ const t=e.touches[0]; sx=t.clientX; sy=t.clientY; }, {passive:true});
+    game.addEventListener('touchend', (e)=>{
+      const t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy;
+      const ax=Math.abs(dx), ay=Math.abs(dy);
+      if (ax<20 && ay<20) return;
+      if (ax>ay) move(dx>0?'right':'left'); else move(dy>0?'down':'up');
+    }, {passive:true});
+
+    // start
+    init();
+  </script>
+</body>
+</html>

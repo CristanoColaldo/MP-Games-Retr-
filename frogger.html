@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Frogger</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    canvas {
+      border: 4px solid #00e5ff;
+      background-color: #142033;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game" width="624" height="672"></canvas>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const SIZE = 48;
+    const COLS = 13;
+    const ROWS = 14;
+    const W = COLS * SIZE;
+    const H = ROWS * SIZE;
+
+    const RIVER_ROWS = [1, 2, 3, 4, 5];
+    const ROAD_ROWS = [7, 8, 9, 10];
+    const GRASS_ROWS = [6, 11, 12];
+    const HOME_ROW = 0;
+    const HOME_COLS = [1, 4, 6, 8, 11];
+
+    let frog, riverLanes = [], roadLanes = [], homes = new Set(), score = 0;
+
+    function tileX(col) {
+      return col * SIZE;
+    }
+
+    function tileY(row) {
+      return row * SIZE;
+    }
+
+    function aabb(a, b) {
+      return a.x < b.x + b.w && a.x + a.w > b.x &&
+             a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+
+    class Entity {
+      constructor(x, y, w, h, speed, dir, color) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        this.speed = speed;
+        this.dir = dir;
+        this.color = color;
+      }
+
+      update(dt) {
+        this.x += this.speed * this.dir * dt;
+        if (this.dir > 0 && this.x > W) this.x = -this.w;
+        if (this.dir < 0 && this.x + this.w < 0) this.x = W;
+      }
+
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+      }
+    }
+
+    function buildLanes(rows, color, isLog = false) {
+      const lanes = [];
+      rows.forEach((row, i) => {
+        const dir = i % 2 === 0 ? 1 : -1;
+        const speed = 100 + i * 10;
+        const y = tileY(row) + 8;
+        const h = SIZE - 16;
+        const w = isLog ? 120 : 80;
+        const count = isLog ? 2 : 3;
+        const spacing = W / count;
+        const ents = [];
+        for (let k = 0; k < count; k++) {
+          const x = k * spacing;
+          ents.push(new Entity(x, y, w, h, speed, dir, color));
+        }
+        lanes.push({ row, ents });
+      });
+      return lanes;
+    }
+
+    function spawnFrog() {
+      const size = SIZE - 12;
+      const x = tileX(Math.floor(COLS / 2)) + 6;
+      const y = tileY(12) + 6;
+      frog = { x, y, w: size, h: size, col: Math.floor(COLS / 2), row: 12 };
+    }
+
+    function drawBackground() {
+      ctx.fillStyle = "#113a64"; // rio
+      RIVER_ROWS.forEach(r => ctx.fillRect(0, tileY(r), W, SIZE));
+
+      ctx.fillStyle = "#1a1f2e"; // estrada
+      ROAD_ROWS.forEach(r => ctx.fillRect(0, tileY(r), W, SIZE));
+
+      ctx.fillStyle = "#1e2b3f"; // grama
+      GRASS_ROWS.forEach(r => ctx.fillRect(0, tileY(r), W, SIZE));
+
+      ctx.fillStyle = "#142033"; // casas
+      ctx.fillRect(0, tileY(0), W, SIZE);
+      HOME_COLS.forEach(c => {
+        const x = tileX(c) + 8;
+        const y = tileY(0) + 8;
+        const w = SIZE - 16;
+        ctx.strokeStyle = "#00ffaa";
+        ctx.strokeRect(x, y, w, w);
+        if (homes.has(c)) {
+          ctx.fillStyle = "#00ffaa";
+          ctx.fillRect(x, y, w, w);
+        }
+      });
+    }
+
+    function drawFrog() {
+      ctx.fillStyle = "#00ff88";
+      ctx.fillRect(frog.x, frog.y, frog.w, frog.h);
+    }
+
+    function drawEntities() {
+      riverLanes.forEach(lane => lane.ents.forEach(e => e.draw()));
+      roadLanes.forEach(lane => lane.ents.forEach(e => e.draw()));
+    }
+
+    function moveFrog(dc, dr) {
+      const newCol = Math.max(0, Math.min(COLS - 1, frog.col + dc));
+      const newRow = Math.max(0, Math.min(ROWS - 1, frog.row + dr));
+      frog.col = newCol;
+      frog.row = newRow;
+      frog.x = tileX(newCol) + 6;
+      frog.y = tileY(newRow) + 6;
+    }
+
+  let ridingLog = null; // tronco em que o sapo está
+
+function checkHazards(dt) {
+  const frogBox = { x: frog.x, y: frog.y, w: frog.w, h: frog.h };
+  ridingLog = null;
+
+  // Estrada - mesma lógica, mata se bater em carro
+  if (ROAD_ROWS.includes(frog.row)) {
+    for (const lane of roadLanes) {
+      if (lane.row !== frog.row) continue;
+      for (const car of lane.ents) {
+        if (aabb(frogBox, car)) {
+          spawnFrog();
+          return;
+        }
+      }
+    }
+  }
+
+  // Rio
+  if (RIVER_ROWS.includes(frog.row)) {
+    for (const lane of riverLanes) {
+      if (lane.row !== frog.row) continue;
+
+      for (const log of lane.ents) {
+        // Aumenta o tronco para facilitar pulo
+        const logBox = {
+          x: log.x - 10,
+          y: log.y,
+          w: log.w + 20,
+          h: log.h,
+        };
+
+        if (aabb(frogBox, logBox)) {
+          ridingLog = log;
+          break;
+        }
+      }
+
+      if (ridingLog) break;
+    }
+
+    if (ridingLog) {
+      // O sapo está sobre um tronco, não morre
+      return;
+    } else {
+      // Não está em cima de tronco, morreu na água
+      spawnFrog();
+      return;
+    }
+  }
+
+  // Casa - mesma lógica
+  if (frog.row === HOME_ROW) {
+    const centerX = frog.x + frog.w / 2;
+    for (const c of HOME_COLS) {
+      const slotX = tileX(c) + 8;
+      if (centerX >= slotX && centerX <= slotX + SIZE - 16) {
+        if (!homes.has(c)) {
+          homes.add(c);
+          score += 100;
+        }
+        spawnFrog();
+        break;
+      }
+    }
+  }
+}
+
+function update(dt) {
+  riverLanes.forEach(l => l.ents.forEach(e => e.update(dt)));
+  roadLanes.forEach(l => l.ents.forEach(e => e.update(dt)));
+
+  // Se estiver em cima de tronco, o sapo se move junto com ele
+  if (ridingLog) {
+    frog.x += ridingLog.speed * ridingLog.dir * dt;
+    // Atualiza coluna do sapo baseado na nova posição
+    frog.col = Math.floor((frog.x - 6) / SIZE);
+    // Se sair da tela pela esquerda ou direita no rio, morreu
+    if (frog.x + frog.w < 0 || frog.x > W) {
+      spawnFrog();
+      return;
+    }
+  }
+
+  checkHazards(dt);
+}
+
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      drawBackground();
+      drawEntities();
+      drawFrog();
+    }
+
+    function loop(timestamp) {
+      if (!last) last = timestamp;
+      const dt = Math.min((timestamp - last) / 1000, 0.05);
+      last = timestamp;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    let last = 0;
+
+    function init() {
+      riverLanes = buildLanes(RIVER_ROWS, "#80ed99", true);
+      roadLanes = buildLanes(ROAD_ROWS, "#ff4d6d", false);
+      spawnFrog();
+      requestAnimationFrame(loop);
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const key = e.key.toLowerCase();
+      if (key === "w") moveFrog(0, -1);
+      if (key === "a") moveFrog(-1, 0);
+      if (key === "d") moveFrog(1, 0);
+    });
+
+    init();
+  </script>
+</body>
+</html>

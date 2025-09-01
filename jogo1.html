@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jogo da Memória</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(120deg, #1e3c72, #2a5298);
+      color: #fff;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      padding: 20px;
+      font-size: 2.5em;
+    }
+
+    #menu {
+      margin: 20px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 1rem;
+      background-color: #ff9800;
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #e68a00;
+    }
+
+    #status {
+      margin: 20px;
+      font-size: 1.2rem;
+    }
+
+    #game-board {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      gap: 10px;
+      max-width: 1200px;
+      margin: 0 auto 50px;
+      padding: 20px;
+    }
+
+    .card {
+      background-color: #ffffff20;
+      border-radius: 10px;
+      height: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.3rem;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s;
+    }
+
+    .card.revealed {
+      background-color: #4caf50;
+      transform: scale(1.05);
+    }
+
+    .card.matched {
+      visibility: hidden;
+    }
+
+    footer {
+      padding: 20px;
+      color: #ccc;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧠 Jogo da Memória</h1>
+
+  <div id="menu">
+    <button onclick="startGame('pvp')">🎮 2 Jogadores</button>
+    <button onclick="startGame('cpu')">🤖 Jogar contra a Máquina</button>
+  </div>
+
+  <div id="status">Escolha o modo de jogo</div>
+  <div id="game-board"></div>
+
+  <footer>Feito com ❤️ inspirado por neal.fun</footer>
+
+  <script>
+    const totalPairs = 52; // 104 cartas
+    let mode = 'pvp';
+    let currentPlayer = 1;
+    let scores = { 1: 0, 2: 0 };
+    let board = [];
+    let firstCard = null;
+    let secondCard = null;
+    let lock = false;
+    let cpuThinking = false;
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function generateCards() {
+      const values = [];
+      for (let i = 1; i <= totalPairs; i++) {
+        values.push(i);
+        values.push(i); // par
+      }
+      return shuffle(values);
+    }
+
+    function startGame(selectedMode) {
+      mode = selectedMode;
+      currentPlayer = 1;
+      scores = { 1: 0, 2: 0 };
+      firstCard = null;
+      secondCard = null;
+      lock = false;
+      cpuThinking = false;
+
+      const gameBoard = document.getElementById('game-board');
+      gameBoard.innerHTML = '';
+      board = generateCards();
+
+      board.forEach((value, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.index = index;
+        card.dataset.value = value;
+        card.textContent = '?';
+        card.addEventListener('click', () => handleCardClick(card));
+        gameBoard.appendChild(card);
+      });
+
+      updateStatus();
+    }
+
+    function updateStatus() {
+      document.getElementById('status').textContent = 
+        `Jogador ${currentPlayer} | Placar - P1: ${scores[1]} ${mode === 'cpu' ? '| CPU: ' + scores[2] : '| P2: ' + scores[2]}`;
+    }
+
+    function handleCardClick(card) {
+      if (lock || card.classList.contains('revealed') || cpuThinking) return;
+
+      card.classList.add('revealed');
+      card.textContent = card.dataset.value;
+
+      if (!firstCard) {
+        firstCard = card;
+      } else {
+        secondCard = card;
+        lock = true;
+
+        const match = firstCard.dataset.value === secondCard.dataset.value;
+
+        setTimeout(() => {
+          if (match) {
+            firstCard.classList.add('matched');
+            secondCard.classList.add('matched');
+            scores[currentPlayer]++;
+          } else {
+            firstCard.classList.remove('revealed');
+            secondCard.classList.remove('revealed');
+            firstCard.textContent = '?';
+            secondCard.textContent = '?';
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+          }
+
+          firstCard = null;
+          secondCard = null;
+          lock = false;
+          updateStatus();
+
+          if (mode === 'cpu' && currentPlayer === 2) {
+            cpuTurn();
+          }
+
+        }, 700);
+      }
+    }
+
+    function cpuTurn() {
+      cpuThinking = true;
+
+      const available = Array.from(document.querySelectorAll('.card'))
+        .filter(c => !c.classList.contains('revealed') && !c.classList.contains('matched'));
+
+      if (available.length < 2) return;
+
+      const pick1 = available[Math.floor(Math.random() * available.length)];
+
+      pick1.classList.add('revealed');
+      pick1.textContent = pick1.dataset.value;
+
+      setTimeout(() => {
+        let pick2;
+        do {
+          pick2 = available[Math.floor(Math.random() * available.length)];
+        } while (pick1 === pick2);
+
+        pick2.classList.add('revealed');
+        pick2.textContent = pick2.dataset.value;
+
+        firstCard = pick1;
+        secondCard = pick2;
+
+        const match = pick1.dataset.value === pick2.dataset.value;
+
+        setTimeout(() => {
+          if (match) {
+            pick1.classList.add('matched');
+            pick2.classList.add('matched');
+            scores[2]++;
+          } else {
+            pick1.classList.remove('revealed');
+            pick2.classList.remove('revealed');
+            pick1.textContent = '?';
+            pick2.textContent = '?';
+            currentPlayer = 1;
+          }
+
+          firstCard = null;
+          secondCard = null;
+          lock = false;
+          cpuThinking = false;
+          updateStatus();
+
+        }, 800);
+
+      }, 700);
+    }
+  </script>
+</body>
+</html>

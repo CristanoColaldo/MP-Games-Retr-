@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MP Retro Games</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background: radial-gradient(circle at top, #0f172a, #020617);
+      overflow-x: hidden;
+    }
+    .card {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .card:hover {
+      transform: translateY(-8px) scale(1.05);
+      box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+    }
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeInUp 1s forwards;
+    }
+    @keyframes fadeInUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center p-6">
+
+  <header class="text-center mt-12 mb-10">
+    <h1 class="text-5xl font-bold mb-4 fade-in" style="animation-delay:0.1s">✨MP Retro Games ✨</h1>
+    <p class="text-lg text-gray-300 fade-in" style="animation-delay:0.3s">Escolha um jogo abaixo e divirta-se!</p>
+  </header>
+
+  <main class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 w-full max-w-6xl">
+
+    <a href="jogo1.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Jogo da Memória</h2>
+      <p class="text-gray-400 mt-2">Você tem memória boa? Então teste com um incrível jogo da memória!</p>
+    </a>
+
+    <a href="jogo2.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Destrua os Asteroides!</h2>
+      <p class="text-gray-400 mt-2">Salve a Terra da destruição do meteoros e pontue ao máximo.</p>
+    </a>
+
+    <a href="jogo3.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Snake 2025</h2>
+      <p class="text-gray-400 mt-2">Cresça sua cobra.</p>
+    </a>
+
+    <a href="flappy.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Flappy Bird</h2>
+      <p class="text-gray-400 mt-2">Clássico viciante reimaginado.</p>
+    </a>
+
+    <a href="clicker-avancado.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Clicker Avançado</h2>
+      <p class="text-gray-400 mt-2">Clique sem parar para pontuar!</p>
+    </a>
+
+    <a href="2048.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">2048</h2>
+      <p class="text-gray-400 mt-2">Combine números até chegar ao 2048!</p>
+    </a>
+
+    <a href="parkour.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Parkour</h2>
+      <p class="text-gray-400 mt-2">Supere obstáculos em alta velocidade.</p>
+    </a>
+
+    
+
+    <a href="tetris.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Tetris</h2>
+      <p class="text-gray-400 mt-2">Complete linhas e quebre recordes.</p>
+    </a>
+
+    <a href="frogger.html" class="card fade-in bg-gray-800 rounded-2xl p-6 text-center hover:bg-gray-700">
+      <h2 class="text-2xl font-semibold">Frogger</h2>
+      <p class="text-gray-400 mt-2">Atravesse ruas e rios sem ser atropelado!</p>
+    </a>
+
+  </main>
+
+  <footer class="mt-16 text-gray-500 text-sm">
+    Feito por Ycaro, Breno e Jão
+  </footer>
+
+  <script>
+    // Aplica delays nas animações dos cards
+    document.querySelectorAll('.fade-in').forEach((el, i) => {
+      el.style.animationDelay = (i * 0.15) + 's';
+    });
+  </script>
+</body>
+</html>

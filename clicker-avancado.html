@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Clicker com Upgrades</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#121933;
+    --panel-2:#0f1530;
+    --accent:#6ee7ff;
+    --accent-2:#a78bfa;
+    --ok:#34d399;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --text:#e5ecff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;
+    color:var(--text);
+    background:
+      radial-gradient(1200px 600px at 20% -10%, #18244d 0%, transparent 60%),
+      radial-gradient(1000px 600px at 120% 20%, #1a2c5a 0%, transparent 60%),
+      var(--bg);
+    min-height:100svh; display:flex; align-items:center; justify-content:center;
+    padding:20px;
+  }
+  .app{
+    width:100%; max-width:1100px; display:grid; gap:16px;
+    grid-template-columns: 1.4fr 1fr;
+  }
+  header{
+    grid-column:1/-1; display:flex; align-items:center; justify-content:space-between;
+    background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border:1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+    padding:14px 18px; border-radius:16px; backdrop-filter: blur(6px);
+  }
+  .title{ display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.3px}
+  .title .logo{
+    width:34px; height:34px; border-radius:10px;
+    background: conic-gradient(from 0deg, var(--accent), var(--accent-2), var(--accent));
+    box-shadow: 0 0 16px rgba(110,231,255,.5);
+  }
+  .stats{ display:flex; gap:18px; flex-wrap:wrap; font-weight:600}
+  .chip{
+    padding:8px 12px; border-radius:12px; background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.1);
+  }
+  .main{
+    background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:20px;
+    display:flex; flex-direction:column; align-items:center; gap:18px;
+  }
+  .big-btn{
+    width:min(90%,520px); aspect-ratio: 1 / 1; max-height:520px; min-height:280px;
+    border-radius:24px; border:none; cursor:pointer; color:#05101a;
+    background:
+      radial-gradient(120px 120px at 50% 38%, #ffffff 0%, #dff7ff 40%, #a7f3ff 70%, #6ee7ff 100%),
+      linear-gradient(180deg, #6ee7ff, #22d3ee);
+    box-shadow: 0 18px 0 #109cb0, 0 28px 40px rgba(0,0,0,.45), inset 0 -12px 30px rgba(0,0,0,.15);
+    font-size: clamp(22px, 3.3vw, 36px); font-weight:800; letter-spacing:.6px;
+    transition: transform .1s ease;
+    position:relative; overflow:hidden;
+  }
+  .big-btn:active{ transform: translateY(6px); box-shadow: 0 12px 0 #109cb0, 0 20px 30px rgba(0,0,0,.45)}
+  .big-btn .shine{
+    position:absolute; inset:-40% -10% auto -10%; height:55%;
+    background: linear-gradient( to bottom, rgba(255,255,255,.7), rgba(255,255,255,0) );
+    transform: rotate(6deg);
+    pointer-events:none;
+  }
+  .mini{
+    display:flex; gap:14px; flex-wrap:wrap; justify-content:center; font-size:14px; opacity:.9
+  }
+  .store{
+    background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:16px;
+    display:flex; flex-direction:column; gap:12px; max-height:700px;
+  }
+  .store h2{ margin:0 0 6px 6px; font-size:18px; opacity:.9; letter-spacing:.3px}
+  .card{
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,0.08);
+    border-radius:14px; padding:12px; display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;
+    box-shadow: 0 8px 22px rgba(0,0,0,.25);
+  }
+  .card .name{ font-weight:700; letter-spacing:.3px}
+  .card .desc{ font-size:12px; opacity:.85}
+  .card .cost{ font-size:13px; opacity:.9}
+  .card button{
+    background:linear-gradient(180deg, #a78bfa, #7c3aed);
+    color:#fff; border:none; border-radius:10px; padding:10px 12px; cursor:pointer; font-weight:800;
+    box-shadow: 0 8px 0 #5125c3, 0 10px 18px rgba(0,0,0,.35);
+    transition: transform .08s ease;
+  }
+  .card button:disabled{
+    background:linear-gradient(180deg, #5b5b6b, #3c3c49); box-shadow:none; cursor:not-allowed; opacity:.7;
+  }
+  .card button:active{ transform: translateY(3px) }
+  .footer-actions{ display:flex; gap:10px; margin-top:6px; flex-wrap:wrap }
+  .link-btn{
+    background:transparent; border:1px solid rgba(255,255,255,.2); color:var(--text);
+    padding:8px 10px; border-radius:10px; cursor:pointer;
+  }
+
+  /* Partículas +X */
+  .particle{
+    position:absolute; pointer-events:none; color:#fff; font-weight:900;
+    text-shadow: 0 2px 10px rgba(0,0,0,.6);
+    animation: floatUp .8s ease-out forwards;
+  }
+  @keyframes floatUp{
+    0%{ transform:translateY(0) scale(1); opacity:1 }
+    100%{ transform:translateY(-50px) scale(0.9); opacity:0 }
+  }
+
+  @media (max-width: 860px){
+    .app{ grid-template-columns: 1fr; }
+    .store{ order: 3 }
+    .main{ order: 2 }
+    header{ order: 1 }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title"><div class="logo"></div> <div>Clicker Ultra</div></div>
+      <div class="stats">
+        <div class="chip">Pontos: <span id="points">0</span></div>
+        <div class="chip">Por clique: <span id="ppc">1</span></div>
+        <div class="chip">Por seg: <span id="pps">0</span></div>
+      </div>
+    </header>
+
+    <section class="main">
+      <button id="clickBtn" class="big-btn">
+        <div class="shine"></div>
+        CLIQUE!
+      </button>
+      <div class="mini">
+        <span>Críticos rendem <b id="critMultLabel">x5</b>.</span>
+        <span>Progresso salvo automaticamente.</span>
+      </div>
+      <div class="footer-actions">
+        <button id="resetBtn" class="link-btn">Resetar Jogo</button>
+      </div>
+    </section>
+
+    <aside class="store">
+      <h2>Loja de Upgrades</h2>
+
+      <div class="card">
+        <div>
+          <div class="name">Auto-clicker</div>
+          <div class="desc">Gera pontos automaticamente por segundo.</div>
+          <div class="cost">Custo: <span id="cost-auto">15</span> | Nível: <span id="lvl-auto">0</span></div>
+        </div>
+        <button id="buy-auto">Comprar</button>
+      </div>
+
+      <div class="card">
+        <div>
+          <div class="name">Multiplicador de Clique</div>
+          <div class="desc">Cada clique rende mais pontos.</div>
+          <div class="cost">Custo: <span id="cost-multi">25</span> | Nível: <span id="lvl-multi">0</span></div>
+        </div>
+        <button id="buy-multi">Comprar</button>
+      </div>
+
+      <div class="card">
+        <div>
+          <div class="name">Chance Crítica</div>
+          <div class="desc">Chance de o clique render <b>x5</b> pontos.</div>
+          <div class="cost">Custo: <span id="cost-crit">40</span> | Nível: <span id="lvl-crit">0</span></div>
+        </div>
+        <button id="buy-crit">Comprar</button>
+      </div>
+    </aside>
+  </div>
+
+<script>
+/* ---------- Estado ---------- */
+const state = {
+  points: 0,
+  clickBase: 1,
+  clickMultiplierLevel: 0,
+  autoLevel: 0,
+  critLevel: 0,
+  critMult: 5,
+  costs: {
+    auto: 15,
+    multi: 25,
+    crit: 40
+  },
+  costScale: 1.15
+};
+
+const el = {
+  points: document.getElementById('points'),
+  ppc: document.getElementById('ppc'),
+  pps: document.getElementById('pps'),
+  clickBtn: document.getElementById('clickBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  costAuto: document.getElementById('cost-auto'),
+  costMulti: document.getElementById('cost-multi'),
+  costCrit: document.getElementById('cost-crit'),
+  lvlAuto: document.getElementById('lvl-auto'),
+  lvlMulti: document.getElementById('lvl-multi'),
+  lvlCrit: document.getElementById('lvl-crit'),
+  buyAuto: document.getElementById('buy-auto'),
+  buyMulti: document.getElementById('buy-multi'),
+  buyCrit: document.getElementById('buy-crit'),
+  critMultLabel: document.getElementById('critMultLabel')
+};
+
+const fmt = n => {
+  if (n < 1000) return n.toFixed(0);
+  const units = ['K','M','B','T','Qa','Qi'];
+  let i = -1;
+  do { n/=1000; i++; } while (n >= 1000 && i < units.length-1);
+  return n.toFixed(2) + units[i];
+};
+
+function save(){
+  localStorage.setItem('clicker-ultra-save', JSON.stringify(state));
+}
+function load(){
+  const s = localStorage.getItem('clicker-ultra-save');
+  if(!s) return;
+  try{
+    const data = JSON.parse(s);
+    Object.assign(state, data);
+  }catch(e){ console.warn('Save inválido'); }
+}
+function reset(){
+  localStorage.removeItem('clicker-ultra-save');
+  state.points = 0;
+  state.clickBase = 1;
+  state.clickMultiplierLevel = 0;
+  state.autoLevel = 0;
+  state.critLevel = 0;
+  state.costs.auto = 15;
+  state.costs.multi = 25;
+  state.costs.crit = 40;
+  render();
+  save();
+}
+
+/* ---------- Cálculos ---------- */
+function pointsPerClick(){
+  // cada nível de multiplicador +100% do base (1, 2, 3, ...)
+  return state.clickBase * (1 + state.clickMultiplierLevel);
+}
+function critChance(){
+  // cada nível +4% (máx 80%)
+  return Math.min(0.8, state.critLevel * 0.04);
+}
+function pointsPerSecond(){
+  // cada nível de auto-clicker = 1 ponto por segundo (antes de multiplicadores)
+  return state.autoLevel * state.clickBase; // base escala levemente com progressão
+}
+
+/* ---------- Render ---------- */
+function render(){
+  el.points.textContent = fmt(state.points);
+  el.ppc.textContent = fmt(pointsPerClick());
+  el.pps.textContent = fmt(pointsPerSecond());
+  el.costAuto.textContent = fmt(Math.ceil(state.costs.auto));
+  el.costMulti.textContent = fmt(Math.ceil(state.costs.multi));
+  el.costCrit.textContent = fmt(Math.ceil(state.costs.crit));
+  el.lvlAuto.textContent = state.autoLevel;
+  el.lvlMulti.textContent = state.clickMultiplierLevel;
+  el.lvlCrit.textContent = state.critLevel;
+  el.critMultLabel.textContent = 'x' + state.critMult;
+
+  // habilitar/desabilitar
+  el.buyAuto.disabled = state.points < state.costs.auto;
+  el.buyMulti.disabled = state.points < state.costs.multi;
+  el.buyCrit.disabled = state.points < state.costs.crit;
+}
+
+/* ---------- Partículas ---------- */
+function spawnParticle(x, y, txt){
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.textContent = txt;
+  document.body.appendChild(p);
+  const rect = el.clickBtn.getBoundingClientRect();
+  // posição próxima ao clique/botão
+  p.style.left = (x ?? (rect.left + rect.width/2)) + 'px';
+  p.style.top  = (y ?? (rect.top + rect.height/2)) + 'px';
+  setTimeout(()=> p.remove(), 800);
+}
+
+/* ---------- Lógica de Clique ---------- */
+function doClick(event){
+  const base = pointsPerClick();
+  const isCrit = Math.random() < critChance();
+  const gain = isCrit ? base * state.critMult : base;
+  state.points += gain;
+
+  // animação/partícula
+  const cx = event?.clientX, cy = event?.clientY;
+  spawnParticle(cx, cy, `+${Math.round(gain)}` + (isCrit ? ' ✨' : ''));
+  el.clickBtn.style.transform = 'translateY(6px)';
+  setTimeout(()=> el.clickBtn.style.transform = '', 90);
+
+  render(); save();
+}
+
+/* ---------- Compras ---------- */
+function buyAuto(){
+  const c = Math.ceil(state.costs.auto);
+  if (state.points < c) return;
+  state.points -= c;
+  state.autoLevel++;
+  state.costs.auto = Math.ceil(state.costs.auto * state.costScale + 1);
+  render(); save();
+}
+function buyMulti(){
+  const c = Math.ceil(state.costs.multi);
+  if (state.points < c) return;
+  state.points -= c;
+  state.clickMultiplierLevel++;
+  state.costs.multi = Math.ceil(state.costs.multi * (state.costScale + 0.03) + 1);
+  render(); save();
+}
+function buyCrit(){
+  const c = Math.ceil(state.costs.crit);
+  if (state.points < c) return;
+  state.points -= c;
+  state.critLevel++;
+  state.costs.crit = Math.ceil(state.costs.crit * (state.costScale + 0.05) + 1);
+  render(); save();
+}
+
+/* ---------- Loop de renda automática ---------- */
+let lastTick = performance.now();
+function tick(now){
+  const dt = (now - lastTick) / 1000; // segundos
+  lastTick = now;
+  // gera PPS continuamente
+  const pps = pointsPerSecond();
+  state.points += pps * dt;
+  // leve progressão do base com o total (efeito “idle” gostoso)
+  state.clickBase = 1 + Math.floor(state.points / 5000);
+  render();
+  requestAnimationFrame(tick);
+}
+
+/* ---------- Eventos ---------- */
+el.clickBtn.addEventListener('click', doClick);
+el.buyAuto.addEventListener('click', buyAuto);
+el.buyMulti.addEventListener('click', buyMulti);
+el.buyCrit.addEventListener('click', buyCrit);
+el.resetBtn.addEventListener('click', ()=>{
+  if(confirm("Tem certeza que deseja resetar o jogo?")) reset();
+});
+document.addEventListener('keydown', (e)=>{
+  if(e.key.toLowerCase()===' ') { e.preventDefault(); doClick(); }
+});
+
+/* ---------- Init ---------- */
+load();
+render();
+requestAnimationFrame((t)=>{ lastTick=t; requestAnimationFrame(tick); });
+// autosave ocasional
+setInterval(save, 2000);
+</script>
+</body>
+</html>
